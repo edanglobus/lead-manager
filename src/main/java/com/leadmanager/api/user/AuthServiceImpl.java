@@ -16,12 +16,13 @@ import com.leadmanager.api.common.security.JwtService;
 
 /**
  * Default {@link AuthService} backed by {@link UserRepository},
- * {@link PasswordEncoder}, and {@link JwtService}.
+ * {@link PasswordEncoder}, {@link JwtService}, and {@link RefreshTokenService}.
  * <p>
- * <b>Why read-only transaction.</b> Login does not mutate state in 1.4c
- * (refresh-token rows arrive in 1.5). Marking the boundary
- * {@code readOnly = true} lets Hibernate skip dirty-checking and lets the
- * datasource pick a read replica when one is configured.
+ * Both {@link #login(LoginCommand)} and {@link #refresh(String)} are
+ * write transactions because each call persists a new {@code refresh_tokens}
+ * row (and refresh additionally revokes the previous one in the same
+ * transaction, so a crash mid-rotation either commits both changes or
+ * neither).
  */
 @Service
 public class AuthServiceImpl implements AuthService {
@@ -32,19 +33,22 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final JwtProperties jwtProperties;
+    private final RefreshTokenService refreshTokenService;
 
     public AuthServiceImpl(UserRepository userRepository,
                            PasswordEncoder passwordEncoder,
                            JwtService jwtService,
-                           JwtProperties jwtProperties) {
+                           JwtProperties jwtProperties,
+                           RefreshTokenService refreshTokenService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.jwtProperties = jwtProperties;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @Override
-    @Transactional(propagation = Propagation.REQUIRED, readOnly = true)
+    @Transactional(propagation = Propagation.REQUIRED)
     public LoginResult login(LoginCommand command) {
         Objects.requireNonNull(command, "command");
 
@@ -60,15 +64,47 @@ public class AuthServiceImpl implements AuthService {
 
         if (!passwordEncoder.matches(command.rawPassword(), hashToCheck) || user == null) {
             // Generic detail — never reveal whether the email exists.
-            log.info("Failed login attempt for email pattern matching local rules");
+            log.info("Failed login attempt");
             throw new ApiException(ErrorCode.INVALID_CREDENTIALS, "Invalid email or password");
         }
 
-        String token = jwtService.issueAccessToken(user.getId());
-        long ttlSeconds = jwtProperties.accessTokenTtl().toSeconds();
+        return issuePair(user.getId(), "logged in");
+    }
 
-        log.info("User {} logged in", user.getId());
-        return new LoginResult(token, ttlSeconds, user.getId());
+    @Override
+    @Transactional(propagation = Propagation.REQUIRED)
+    public LoginResult refresh(String refreshTokenPlaintext) {
+        RefreshToken existing = refreshTokenService.findActive(refreshTokenPlaintext)
+                .orElseThrow(() -> new ApiException(
+                        ErrorCode.INVALID_REFRESH_TOKEN,
+                        "Refresh token is invalid or expired"));
+
+        Long userId = existing.getUserId();
+        String accessToken = jwtService.issueAccessToken(userId);
+        RefreshTokenService.Issued newRefresh = refreshTokenService.issue(userId);
+        // Atomic within this transaction: old is revoked, new is persisted,
+        // chain pointer set. A crash here would roll back all three.
+        refreshTokenService.replace(existing, newRefresh.entity());
+
+        log.info("User {} refreshed token", userId);
+        return new LoginResult(
+                accessToken,
+                jwtProperties.accessTokenTtl().toSeconds(),
+                newRefresh.plaintext(),
+                userId);
+    }
+
+    /** Shared "issue a fresh (access, refresh) pair for this user" path. */
+    private LoginResult issuePair(Long userId, String logVerb) {
+        String accessToken = jwtService.issueAccessToken(userId);
+        RefreshTokenService.Issued refresh = refreshTokenService.issue(userId);
+
+        log.info("User {} {}", userId, logVerb);
+        return new LoginResult(
+                accessToken,
+                jwtProperties.accessTokenTtl().toSeconds(),
+                refresh.plaintext(),
+                userId);
     }
 
     /**

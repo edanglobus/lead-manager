@@ -168,7 +168,7 @@ class AuthControllerTest {
     @Test
     void login_returns200_andTokenBody_onHappyPath() throws Exception {
         when(authService.login(any(LoginCommand.class)))
-                .thenReturn(new LoginResult("issued.jwt.token", 900L, 42L));
+                .thenReturn(new LoginResult("issued.jwt.token", 900L, "refresh-plaintext", 42L));
 
         mockMvc.perform(jsonPost("/api/v1/auth/login", """
                 {
@@ -180,10 +180,58 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.accessToken").value("issued.jwt.token"))
                 .andExpect(jsonPath("$.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.expiresIn").value(900))
+                .andExpect(jsonPath("$.refreshToken").value("refresh-plaintext"))
                 // The plaintext password must NEVER appear in the response.
                 .andExpect(jsonPath("$.password").doesNotExist());
 
         verify(authService).login(any(LoginCommand.class));
+    }
+
+    // ---------- /refresh tests ----------
+
+    @Test
+    void refresh_returns200_andRotatedPair_onHappyPath() throws Exception {
+        when(authService.refresh("old-refresh"))
+                .thenReturn(new LoginResult("new.access.token", 900L, "new-refresh", 42L));
+
+        mockMvc.perform(jsonPost("/api/v1/auth/refresh", """
+                {
+                  "refreshToken": "old-refresh"
+                }
+                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("new.access.token"))
+                .andExpect(jsonPath("$.refreshToken").value("new-refresh"))
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.expiresIn").value(900));
+    }
+
+    @Test
+    void refresh_returns400_whenBodyMissingField() throws Exception {
+        mockMvc.perform(jsonPost("/api/v1/auth/refresh", "{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()))
+                .andExpect(jsonPath("$.errors[?(@.field=='refreshToken')]").exists());
+
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    void refresh_returns401_onInvalidRefreshToken() throws Exception {
+        when(authService.refresh("expired-or-bogus"))
+                .thenThrow(new ApiException(
+                        ErrorCode.INVALID_REFRESH_TOKEN,
+                        "Refresh token is invalid or expired"));
+
+        mockMvc.perform(jsonPost("/api/v1/auth/refresh", """
+                {
+                  "refreshToken": "expired-or-bogus"
+                }
+                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(ErrorCode.INVALID_REFRESH_TOKEN.name()))
+                .andExpect(jsonPath("$.type").value(ErrorCode.INVALID_REFRESH_TOKEN.typeUri()))
+                .andExpect(jsonPath("$.status").value(401));
     }
 
     @Test

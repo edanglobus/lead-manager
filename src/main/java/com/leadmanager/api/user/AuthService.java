@@ -12,7 +12,7 @@ package com.leadmanager.api.user;
 public interface AuthService {
 
     /**
-     * Verify credentials and mint an access token.
+     * Verify credentials and mint a fresh (access, refresh) pair.
      * <p>
      * Invariants:
      * <ul>
@@ -22,14 +22,28 @@ public interface AuthService {
      *       which runs bcrypt's intentionally slow check (mitigates
      *       brute force).</li>
      *   <li>"No such user" and "wrong password" surface as the SAME
-     *       {@code ErrorCode.INVALID_CREDENTIALS} with the same generic
-     *       message — preventing an attacker from probing which emails
-     *       are registered.</li>
+     *       {@code ErrorCode.INVALID_CREDENTIALS} — preventing an attacker
+     *       from probing which emails are registered.</li>
      * </ul>
      *
      * @throws com.leadmanager.api.common.exception.ApiException
-     *         {@code ErrorCode.INVALID_CREDENTIALS} if either the email
-     *         is unknown or the password does not match
+     *         {@code INVALID_CREDENTIALS} if the email is unknown or the
+     *         password does not match
      */
     LoginResult login(LoginCommand command);
+
+    /**
+     * Rotate a refresh token into a fresh (access, refresh) pair. The old
+     * refresh token is revoked atomically and linked to the new one via
+     * {@code replaced_by_id} for audit. Subsequent calls with the old
+     * refresh token will fail.
+     *
+     * @param refreshTokenPlaintext the opaque plaintext from a prior
+     *                              {@code /auth/login} or {@code /auth/refresh}
+     *                              response
+     * @throws com.leadmanager.api.common.exception.ApiException
+     *         {@code INVALID_REFRESH_TOKEN} if the token is unknown,
+     *         expired, or already revoked
+     */
+    LoginResult refresh(String refreshTokenPlaintext);
 }

@@ -21,6 +21,7 @@ public enum ErrorCode {
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed"),
     UNAUTHENTICATED(HttpStatus.UNAUTHORIZED, "unauthenticated", "Authentication required"),
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "invalid-credentials", "Invalid email or password"),
+    INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "invalid-refresh-token", "Refresh token is invalid or expired"),
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "resource-not-found", "Resource not found"),
     EMAIL_TAKEN(HttpStatus.CONFLICT, "email-taken", "Email already registered"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "internal-error", "Internal server error");

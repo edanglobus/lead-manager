@@ -83,6 +83,24 @@ public class AuthController {
     @PostMapping("/login")
     public LoginResponse login(@Valid @RequestBody LoginRequest request) {
         LoginResult result = authService.login(new LoginCommand(request.email(), request.password()));
-        return LoginResponse.bearer(result.accessToken(), result.expiresInSeconds());
+        return LoginResponse.bearer(result.accessToken(), result.expiresInSeconds(), result.refreshToken());
+    }
+
+    /**
+     * Rotates a refresh token into a fresh (access, refresh) pair.
+     * <p>
+     * Responses:
+     * <ul>
+     *   <li>{@code 200 OK} with a {@link LoginResponse} body on success.
+     *       The old refresh token is now revoked.</li>
+     *   <li>{@code 400 Bad Request} (RFC 7807) if Bean Validation fails.</li>
+     *   <li>{@code 401 Unauthorized} (RFC 7807, {@code code=INVALID_REFRESH_TOKEN})
+     *       if the supplied token is unknown, already revoked, or expired.</li>
+     * </ul>
+     */
+    @PostMapping("/refresh")
+    public LoginResponse refresh(@Valid @RequestBody RefreshRequest request) {
+        LoginResult result = authService.refresh(request.refreshToken());
+        return LoginResponse.bearer(result.accessToken(), result.expiresInSeconds(), result.refreshToken());
     }
 }
