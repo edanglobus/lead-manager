@@ -1,9 +1,11 @@
 package com.leadmanager.api.user.web;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -102,5 +104,20 @@ public class AuthController {
     public LoginResponse refresh(@Valid @RequestBody RefreshRequest request) {
         LoginResult result = authService.refresh(request.refreshToken());
         return LoginResponse.bearer(result.accessToken(), result.expiresInSeconds(), result.refreshToken());
+    }
+
+    /**
+     * Revokes every active refresh token belonging to the holder of the
+     * supplied refresh token. Idempotent — bogus / expired / already-revoked
+     * tokens also return {@code 204} so an attacker cannot distinguish
+     * valid tokens by response code.
+     * <p>
+     * Note: access tokens already issued remain valid until their TTL
+     * elapses. A denylist for access tokens is a future feature.
+     */
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void logout(@Valid @RequestBody LogoutRequest request) {
+        authService.logout(request.refreshToken());
     }
 }

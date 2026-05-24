@@ -94,6 +94,18 @@ public class AuthServiceImpl implements AuthService {
                 userId);
     }
 
+    @Override
+    @Transactional(propagation = Propagation.REQUIRED)
+    public void logout(String refreshTokenPlaintext) {
+        refreshTokenService.findActive(refreshTokenPlaintext).ifPresent(token -> {
+            refreshTokenService.revokeAllActiveForUser(token.getUserId());
+            log.info("User {} logged out", token.getUserId());
+        });
+        // Intentional silence when the token is unknown / expired / revoked —
+        // logout is idempotent and a noisy 401 here would let an attacker
+        // distinguish "valid token" from "garbage" by response code.
+    }
+
     /** Shared "issue a fresh (access, refresh) pair for this user" path. */
     private LoginResult issuePair(Long userId, String logVerb) {
         String accessToken = jwtService.issueAccessToken(userId);

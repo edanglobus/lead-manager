@@ -188,4 +188,26 @@ class AuthServiceImplTest {
         verify(refreshTokenService, never()).issue(any());
         verify(refreshTokenService, never()).replace(any(), any());
     }
+
+    // ---------- logout() tests ----------
+
+    @Test
+    void logout_validToken_revokesAllForThatUser() {
+        RefreshToken existing = stubRefreshTokenEntity(7L);
+        when(refreshTokenService.findActive("valid-plaintext")).thenReturn(Optional.of(existing));
+
+        authService.logout("valid-plaintext");
+
+        verify(refreshTokenService).revokeAllActiveForUser(7L);
+    }
+
+    @Test
+    void logout_invalidToken_isSilent_noopRevoke() {
+        when(refreshTokenService.findActive("bogus")).thenReturn(Optional.empty());
+
+        // Must not throw — idempotent.
+        authService.logout("bogus");
+
+        verify(refreshTokenService, never()).revokeAllActiveForUser(any());
+    }
 }

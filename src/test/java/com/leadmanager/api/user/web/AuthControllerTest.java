@@ -234,6 +234,44 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.status").value(401));
     }
 
+    // ---------- /logout tests ----------
+
+    @Test
+    void logout_returns204_andCallsService_onValidToken() throws Exception {
+        mockMvc.perform(jsonPost("/api/v1/auth/logout", """
+                {
+                  "refreshToken": "any-token"
+                }
+                """))
+                .andExpect(status().isNoContent());
+
+        verify(authService).logout("any-token");
+    }
+
+    @Test
+    void logout_returns204_evenForBogusToken_byDesign() throws Exception {
+        // Idempotent: the service silently no-ops on unknown tokens so we
+        // cannot enumerate valid refresh tokens via response codes.
+        mockMvc.perform(jsonPost("/api/v1/auth/logout", """
+                {
+                  "refreshToken": "totally-bogus"
+                }
+                """))
+                .andExpect(status().isNoContent());
+
+        verify(authService).logout("totally-bogus");
+    }
+
+    @Test
+    void logout_returns400_whenBodyMissingField() throws Exception {
+        mockMvc.perform(jsonPost("/api/v1/auth/logout", "{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()))
+                .andExpect(jsonPath("$.errors[?(@.field=='refreshToken')]").exists());
+
+        verifyNoInteractions(authService);
+    }
+
     @Test
     void login_returns400_problemDetail_whenEmailMalformed() throws Exception {
         mockMvc.perform(jsonPost("/api/v1/auth/login", """
