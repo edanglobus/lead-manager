@@ -22,6 +22,16 @@ spring:
     baseline-on-migrate: false
     validate-on-migrate: true
 
+lead-manager:
+  jwt:
+    # HS256 requires at least a 256-bit (32-byte) secret. JwtProperties
+    # validates this at startup so a too-short secret fails fast with a
+    # clear error rather than a cryptic crypto exception on first request.
+    secret: ${JWT_SECRET}
+    issuer: ${JWT_ISSUER:lead-manager-api}
+    access-token-ttl:  ${JWT_ACCESS_TOKEN_TTL:PT15M}    # ISO-8601 duration; default 15 min
+    refresh-token-ttl: ${JWT_REFRESH_TOKEN_TTL:P30D}    # default 30 days
+
 server:
   port: ${SERVER_PORT:8080}
   error:
