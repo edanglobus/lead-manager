@@ -27,6 +27,9 @@ import com.leadmanager.api.common.security.JwtAuthFilter;
 import com.leadmanager.api.common.security.JwtAuthenticationEntryPoint;
 import com.leadmanager.api.common.security.JwtService;
 import com.leadmanager.api.common.security.SecurityConfig;
+import com.leadmanager.api.user.AuthService;
+import com.leadmanager.api.user.LoginCommand;
+import com.leadmanager.api.user.LoginResult;
 import com.leadmanager.api.user.RegisterUserCommand;
 import com.leadmanager.api.user.User;
 import com.leadmanager.api.user.UserService;
@@ -64,9 +67,13 @@ class AuthControllerTest {
     @MockBean
     private UserService userService;
 
+    @MockBean
+    private AuthService authService;
+
     // SecurityConfig pulls in JwtAuthFilter, which depends on JwtService.
-    // /auth/register is permitAll so the filter never needs to do anything,
-    // but the bean still has to exist for the context to start.
+    // /auth/register and /auth/login are permitAll so the filter never needs
+    // to do anything here, but the bean still has to exist for the context
+    // to start.
     @MockBean
     private JwtService jwtService;
 
@@ -156,10 +163,70 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.status").value(409));
     }
 
+    // ---------- /login tests ----------
+
+    @Test
+    void login_returns200_andTokenBody_onHappyPath() throws Exception {
+        when(authService.login(any(LoginCommand.class)))
+                .thenReturn(new LoginResult("issued.jwt.token", 900L, 42L));
+
+        mockMvc.perform(jsonPost("/api/v1/auth/login", """
+                {
+                  "email":    "alice@example.com",
+                  "password": "correcthorsebatterystaple"
+                }
+                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("issued.jwt.token"))
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.expiresIn").value(900))
+                // The plaintext password must NEVER appear in the response.
+                .andExpect(jsonPath("$.password").doesNotExist());
+
+        verify(authService).login(any(LoginCommand.class));
+    }
+
+    @Test
+    void login_returns400_problemDetail_whenEmailMalformed() throws Exception {
+        mockMvc.perform(jsonPost("/api/v1/auth/login", """
+                {
+                  "email":    "not-an-email",
+                  "password": "any-password"
+                }
+                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()))
+                .andExpect(jsonPath("$.errors[?(@.field=='email')]").exists());
+
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    void login_returns401_problemDetail_onInvalidCredentials() throws Exception {
+        when(authService.login(any(LoginCommand.class)))
+                .thenThrow(new ApiException(ErrorCode.INVALID_CREDENTIALS, "Invalid email or password"));
+
+        mockMvc.perform(jsonPost("/api/v1/auth/login", """
+                {
+                  "email":    "alice@example.com",
+                  "password": "wrongpassword"
+                }
+                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value(ErrorCode.INVALID_CREDENTIALS.name()))
+                .andExpect(jsonPath("$.type").value(ErrorCode.INVALID_CREDENTIALS.typeUri()))
+                .andExpect(jsonPath("$.status").value(401));
+    }
+
     // ---------- helpers ----------
 
+    /** Shorthand for /auth/register, the original path tested by this class. */
     private MockHttpServletRequestBuilder jsonPost(String body) {
-        return post("/api/v1/auth/register")
+        return jsonPost("/api/v1/auth/register", body);
+    }
+
+    private MockHttpServletRequestBuilder jsonPost(String path, String body) {
+        return post(path)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body);
     }
