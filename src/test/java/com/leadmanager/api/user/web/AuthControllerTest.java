@@ -23,6 +23,10 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import com.leadmanager.api.common.exception.ApiException;
 import com.leadmanager.api.common.exception.ErrorCode;
 import com.leadmanager.api.common.exception.GlobalExceptionHandler;
+import com.leadmanager.api.common.security.JwtAuthFilter;
+import com.leadmanager.api.common.security.JwtAuthenticationEntryPoint;
+import com.leadmanager.api.common.security.JwtService;
+import com.leadmanager.api.common.security.SecurityConfig;
 import com.leadmanager.api.user.RegisterUserCommand;
 import com.leadmanager.api.user.User;
 import com.leadmanager.api.user.UserService;
@@ -45,7 +49,13 @@ import com.leadmanager.api.user.UserService;
  * </ul>
  */
 @WebMvcTest(AuthController.class)
-@Import({UserMapperImpl.class, GlobalExceptionHandler.class})
+@Import({
+        UserMapperImpl.class,
+        GlobalExceptionHandler.class,
+        SecurityConfig.class,
+        JwtAuthFilter.class,
+        JwtAuthenticationEntryPoint.class
+})
 class AuthControllerTest {
 
     @Autowired
@@ -53,6 +63,12 @@ class AuthControllerTest {
 
     @MockBean
     private UserService userService;
+
+    // SecurityConfig pulls in JwtAuthFilter, which depends on JwtService.
+    // /auth/register is permitAll so the filter never needs to do anything,
+    // but the bean still has to exist for the context to start.
+    @MockBean
+    private JwtService jwtService;
 
     @Test
     void register_returns201_andLocationHeader_onHappyPath() throws Exception {
