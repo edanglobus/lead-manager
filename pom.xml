@@ -64,6 +64,18 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!--
+            Spring Security crypto ONLY (PasswordEncoder + BCrypt). The full
+            spring-boot-starter-security (which brings the servlet filter
+            chain) lands in slice 1.4 alongside the JWT filter; keeping it
+            minimal here means no accidental "deny all" on the API while we
+            don't yet have a filter chain configured.
+        -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>
