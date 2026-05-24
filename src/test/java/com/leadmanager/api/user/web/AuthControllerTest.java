@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,7 +66,7 @@ class AuthControllerTest {
         // web-slice test we cheat them in via reflection so the response
         // has the values we want to assert on.
         setField(stub, "id", 42L);
-        setField(stub, "createdAt", OffsetDateTime.parse("2026-05-24T10:00:00Z"));
+        setField(stub, "createdAt", Instant.parse("2026-05-24T10:00:00Z"));
         when(userService.register(any(RegisterUserCommand.class))).thenReturn(stub);
 
         mockMvc.perform(jsonPost("""

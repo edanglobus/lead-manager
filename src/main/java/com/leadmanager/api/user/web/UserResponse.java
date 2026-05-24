@@ -1,6 +1,6 @@
 package com.leadmanager.api.user.web;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 
 /**
  * Public JSON view of a {@link com.leadmanager.api.user.User}.
@@ -28,6 +28,6 @@ public record UserResponse(
         String email,
         String displayName,
         String phone,
-        OffsetDateTime createdAt
+        Instant createdAt
 ) {
 }
