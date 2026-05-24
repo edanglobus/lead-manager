@@ -20,6 +20,7 @@ public enum ErrorCode {
 
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "validation-failed", "Validation failed"),
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "resource-not-found", "Resource not found"),
+    EMAIL_TAKEN(HttpStatus.CONFLICT, "email-taken", "Email already registered"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "internal-error", "Internal server error");
 
     private static final String TYPE_BASE = "https://leadmanager.com/errors/";
