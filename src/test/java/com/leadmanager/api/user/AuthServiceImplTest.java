@@ -42,7 +42,8 @@ class AuthServiceImplTest {
     private final JwtProperties props = new JwtProperties(
             "test-secret-of-32-bytes-or-more!!!!",
             "lead-manager-test",
-            Duration.ofMinutes(15));
+            Duration.ofMinutes(15),
+            Duration.ofDays(30));
 
     @InjectMocks
     private AuthServiceImpl authService;

@@ -24,7 +24,8 @@ class JwtServiceTest {
     private static final JwtProperties PROPS = new JwtProperties(
             "test-secret-of-32-bytes-or-more!!!!",
             "lead-manager-test",
-            Duration.ofMinutes(15)
+            Duration.ofMinutes(15),
+            Duration.ofDays(30)
     );
 
     private static final Instant T0 = Instant.parse("2026-05-24T10:00:00Z");
@@ -63,7 +64,8 @@ class JwtServiceTest {
                 new JwtProperties(
                         "a-different-secret-also-32-bytes!!",
                         PROPS.issuer(),
-                        PROPS.accessTokenTtl()),
+                        PROPS.accessTokenTtl(),
+                        PROPS.refreshTokenTtl()),
                 Clock.fixed(T0, ZoneOffset.UTC));
 
         String token = issuer.issueAccessToken(1L);
@@ -76,7 +78,7 @@ class JwtServiceTest {
     @Test
     void parseAccessToken_rejectsTokenWithWrongIssuer() {
         JwtService foreign = new JwtService(
-                new JwtProperties(PROPS.secret(), "some-other-issuer", PROPS.accessTokenTtl()),
+                new JwtProperties(PROPS.secret(), "some-other-issuer", PROPS.accessTokenTtl(), PROPS.refreshTokenTtl()),
                 Clock.fixed(T0, ZoneOffset.UTC));
         JwtService ours = new JwtService(PROPS, Clock.fixed(T0, ZoneOffset.UTC));
 
