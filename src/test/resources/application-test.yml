@@ -1,0 +1,13 @@
+# Test profile: datasource is supplied at runtime via @ServiceConnection
+# on the Testcontainers Postgres instance. We only override what's needed
+# so tests don't depend on a local DB_PASSWORD env var.
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+logging:
+  level:
+    org.flywaydb: INFO

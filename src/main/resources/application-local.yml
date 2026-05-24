@@ -1,0 +1,11 @@
+logging:
+  level:
+    com.leadmanager: DEBUG
+    org.flywaydb: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+
+management:
+  endpoint:
+    health:
+      show-details: always

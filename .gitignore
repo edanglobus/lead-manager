@@ -1,0 +1,69 @@
+# --- Build output ---
+target/
+build/
+out/
+bin/
+*.class
+
+# --- Maven ---
+!**/src/main/**/target/
+!**/src/test/**/target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar.bak
+
+# --- Spring Boot ---
+HELP.md
+*.original
+spring-boot-*.log
+
+# --- IDE: IntelliJ ---
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# --- IDE: VS Code ---
+.vscode/
+*.code-workspace
+
+# --- IDE: Eclipse / STS ---
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache
+
+# --- IDE: NetBeans ---
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Secrets / local env ---
+.env
+.env.*
+!.env.example
+
+# --- Logs ---
+*.log
+logs/
+
+# --- Docker volumes (if mounted into project) ---
+pgdata/
+
+# --- Node (for future frontend packages) ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
