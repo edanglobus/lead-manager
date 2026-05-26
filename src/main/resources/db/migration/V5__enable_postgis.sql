@@ -1,0 +1,22 @@
+-- =====================================================================
+-- V5__enable_postgis.sql
+-- Enables the PostGIS extension so future migrations can use geography
+-- and geometry types (slice 3 introduces ServiceArea with radius queries
+-- driven by ST_DWithin on a geography(Point) column).
+--
+-- Notes:
+--   * Pulled forward into this slice (alongside service_categories) so
+--     slice 3 stays focused on geo logic, not infrastructure.
+--   * The base Docker image must include PostGIS — see docker-compose.yml
+--     which uses postgis/postgis:16-3.4-alpine for local dev. Production
+--     environments must enable the extension via their managed-Postgres
+--     console before deploying this migration.
+--   * Idempotent (IF NOT EXISTS) so re-running on an environment that
+--     already has PostGIS installed is a no-op.
+--   * Requires CREATE privilege on the database. In local dev the
+--     `leadmanager` user is the DB owner, so this works. In RDS / Cloud
+--     SQL the extension is typically pre-installed by the platform and
+--     this statement becomes a no-op.
+-- =====================================================================
+
+CREATE EXTENSION IF NOT EXISTS postgis;

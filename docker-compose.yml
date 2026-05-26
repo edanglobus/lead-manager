@@ -1,6 +1,8 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    # PostGIS bundled image (same Postgres 16 engine, so the existing pgdata
+    # volume reads cleanly). Required by V5__enable_postgis.sql onwards.
+    image: postgis/postgis:16-3.4-alpine
     container_name: lead-manager-postgres
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-leadmanager}
