@@ -13,10 +13,14 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+
+import jakarta.validation.ConstraintViolationException;
 
 /**
  * Single point of translation from thrown exceptions to RFC 7807 {@link ProblemDetail}
@@ -65,6 +69,87 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     }
 
     /**
+     * A required query param / path var was absent. Without this override
+     * {@link ResponseEntityExceptionHandler} returns an empty 400 body,
+     * breaking the RFC 7807 contract every other 4xx response honours.
+     */
+    @Override
+    protected ResponseEntity<Object> handleMissingServletRequestParameter(
+            MissingServletRequestParameterException ex,
+            HttpHeaders headers,
+            HttpStatusCode status,
+            WebRequest request) {
+
+        Map<String, String> fieldError = Map.of(
+                "field", ex.getParameterName(),
+                "message", ex.getParameterName() + " is required");
+
+        log.warn("Missing parameter at {}: {}", path(request), ex.getParameterName());
+
+        return ResponseEntity
+                .status(ErrorCode.VALIDATION_FAILED.status())
+                .body(problem(
+                        ErrorCode.VALIDATION_FAILED,
+                        "Required parameter is missing",
+                        request,
+                        Map.of("errors", List.of(fieldError))));
+    }
+
+    /**
+     * A query param / path var could not be coerced to its target type
+     * (e.g. {@code categoryId=abc} where the controller declares {@code Long}).
+     * Same rationale as {@link #handleMissingServletRequestParameter}: keep
+     * the wire contract uniform.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ProblemDetail> handleTypeMismatch(
+            MethodArgumentTypeMismatchException ex, WebRequest request) {
+
+        Map<String, String> fieldError = Map.of(
+                "field", ex.getName(),
+                "message", ex.getName() + " has an invalid value");
+
+        log.warn("Type mismatch at {}: {} = {}", path(request), ex.getName(), ex.getValue());
+
+        return ResponseEntity
+                .status(ErrorCode.VALIDATION_FAILED.status())
+                .body(problem(
+                        ErrorCode.VALIDATION_FAILED,
+                        "Request parameter has an invalid value",
+                        request,
+                        Map.of("errors", List.of(fieldError))));
+    }
+
+    /**
+     * Bean Validation failures on individual method parameters (query
+     * params, path variables) — distinct from {@link MethodArgumentNotValidException}
+     * which only fires for {@code @Valid @RequestBody} payloads. Without
+     * this handler, a 400-worthy "lat must be <= 90" would fall through
+     * to {@link #handleUnexpected(Exception, WebRequest) handleUnexpected}
+     * and surface as an opaque 500.
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ProblemDetail> handleConstraintViolation(
+            ConstraintViolationException ex, WebRequest request) {
+
+        List<Map<String, String>> fieldErrors = ex.getConstraintViolations().stream()
+                .map(v -> Map.of(
+                        "field", lastNode(v.getPropertyPath().toString()),
+                        "message", v.getMessage()))
+                .toList();
+
+        log.warn("Constraint violation at {}: {} field(s) invalid", path(request), fieldErrors.size());
+
+        return ResponseEntity
+                .status(ErrorCode.VALIDATION_FAILED.status())
+                .body(problem(
+                        ErrorCode.VALIDATION_FAILED,
+                        "Request parameters failed validation",
+                        request,
+                        Map.of("errors", fieldErrors)));
+    }
+
+    /**
      * Last-resort handler. Anything not matched above is logged at ERROR with the
      * full stack trace (for ops) but the wire response carries only a generic
      * message — never the underlying exception detail.
@@ -96,5 +181,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static String path(WebRequest request) {
         String desc = request.getDescription(false);
         return desc != null && desc.startsWith("uri=") ? desc.substring(4) : desc;
+    }
+
+    /**
+     * Trims a {@code jakarta.validation} property path like
+     * {@code findNearby.query.latitude} down to the last segment
+     * ({@code latitude}) so the wire-level {@code field} value matches the
+     * shape produced by {@link #handleMethodArgumentNotValid} for body validation.
+     */
+    private static String lastNode(String propertyPath) {
+        int lastDot = propertyPath.lastIndexOf('.');
+        return lastDot < 0 ? propertyPath : propertyPath.substring(lastDot + 1);
     }
 }
