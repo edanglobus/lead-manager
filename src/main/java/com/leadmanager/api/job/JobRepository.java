@@ -1,5 +1,6 @@
 package com.leadmanager.api.job;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -38,4 +39,22 @@ public interface JobRepository extends JpaRepository<Job, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT j FROM Job j WHERE j.id = :id")
     Optional<Job> findByIdForUpdate(@Param("id") Long id);
+
+    /**
+     * "My listings" view: jobs the caller created. Order by id DESC
+     * (rather than created_at DESC) so the result is deterministic
+     * across rows inserted in the same millisecond. Hits the
+     * {@code jobs_originator_state_ix} composite index for the
+     * leading column scan.
+     */
+    List<Job> findAllByOriginatorUserIdOrderByIdDesc(Long originatorUserId);
+
+    /**
+     * "My work" view: jobs currently assigned to the caller. The
+     * partial index {@code jobs_assignee_active_ix} on
+     * {@code (current_assignee_user_id, state) WHERE current_assignee_user_id IS NOT NULL}
+     * keeps this lookup fast — only rows that have an assignee are
+     * indexed at all.
+     */
+    List<Job> findAllByCurrentAssigneeUserIdOrderByIdDesc(Long assigneeUserId);
 }

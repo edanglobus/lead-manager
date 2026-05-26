@@ -24,6 +24,8 @@ public enum ErrorCode {
     INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "invalid-refresh-token", "Refresh token is invalid or expired"),
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "resource-not-found", "Resource not found"),
     EMAIL_TAKEN(HttpStatus.CONFLICT, "email-taken", "Email already registered"),
+    JOB_STATE_TRANSITION_NOT_ALLOWED(HttpStatus.CONFLICT, "job-state-transition-not-allowed", "Job is not in a state that allows this operation"),
+    CONCURRENT_MODIFICATION(HttpStatus.CONFLICT, "concurrent-modification", "The resource was modified by another request; please retry"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "internal-error", "Internal server error");
 
     private static final String TYPE_BASE = "https://leadmanager.com/errors/";
