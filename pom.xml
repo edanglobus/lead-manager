@@ -43,6 +43,17 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!--
+            Hibernate Spatial — adds geometry/geography type support to JPA so
+            entities can have org.locationtech.jts.geom.Point columns that map
+            to PostGIS geography(Point,4326). Version is managed by the
+            Spring Boot BOM (kept in lock-step with hibernate-core).
+        -->
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-spatial</artifactId>
+        </dependency>
+
         <!-- Migrations: Flyway 10 requires explicit DB module -->
         <dependency>
             <groupId>org.flywaydb</groupId>
