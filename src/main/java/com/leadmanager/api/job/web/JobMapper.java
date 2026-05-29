@@ -43,5 +43,17 @@ public interface JobMapper {
     @Mapping(target = "customerLongitude", expression = "java(job.getCustomerLocation().getX())")
     JobResponse toResponse(Job job);
 
+    /**
+     * Entity → masked response for a transfer candidate. The two
+     * privacy-sensitive fields are absent from
+     * {@link MaskedJobResponse}, so MapStruct simply does not write
+     * them — no nulls land on the wire. The lat/lng unpacking is
+     * identical to {@link #toResponse(Job)} (rough geo is fine to
+     * show; precise address is the part that's withheld).
+     */
+    @Mapping(target = "customerLatitude",  expression = "java(job.getCustomerLocation().getY())")
+    @Mapping(target = "customerLongitude", expression = "java(job.getCustomerLocation().getX())")
+    MaskedJobResponse toMaskedResponse(Job job);
+
     List<JobResponse> toResponses(List<Job> jobs);
 }

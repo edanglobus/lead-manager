@@ -192,17 +192,44 @@ class JobControllerTest {
     }
 
     @Test
-    void findOne_returns200_whenVisibleToCaller() throws Exception {
+    void findOne_returns200_andFullResponse_whenVisibilityIsFull() throws Exception {
         when(jwtService.parseAccessToken(VALID_TOKEN)).thenReturn(PRINCIPAL_USER_ID);
         when(jobService.findOne(PRINCIPAL_USER_ID, 99L))
-                .thenReturn(stubJob(JobState.IN_PROGRESS, 42L));
+                .thenReturn(new com.leadmanager.api.job.JobAccess(
+                        stubJob(JobState.IN_PROGRESS, 42L),
+                        com.leadmanager.api.job.JobVisibilityPolicy.Visibility.FULL));
 
         mockMvc.perform(get(ENDPOINT + "/99")
                         .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(99))
                 .andExpect(jsonPath("$.state").value("IN_PROGRESS"))
-                .andExpect(jsonPath("$.currentAssigneeUserId").value(42));
+                .andExpect(jsonPath("$.currentAssigneeUserId").value(42))
+                // PII visible at FULL
+                .andExpect(jsonPath("$.customerAddress").value("Dizengoff 100, Tel Aviv"))
+                .andExpect(jsonPath("$.customerPhone").value("+972-50-1234567"));
+    }
+
+    @Test
+    void findOne_returns200_andMaskedResponse_whenVisibilityIsMasked() throws Exception {
+        when(jwtService.parseAccessToken(VALID_TOKEN)).thenReturn(PRINCIPAL_USER_ID);
+        when(jobService.findOne(PRINCIPAL_USER_ID, 99L))
+                .thenReturn(new com.leadmanager.api.job.JobAccess(
+                        stubJob(JobState.PENDING_TRANSFER, null),
+                        com.leadmanager.api.job.JobVisibilityPolicy.Visibility.MASKED));
+
+        mockMvc.perform(get(ENDPOINT + "/99")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + VALID_TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(99))
+                .andExpect(jsonPath("$.state").value("PENDING_TRANSFER"))
+                // Visible fields stay
+                .andExpect(jsonPath("$.customerName").value("Jane Doe"))
+                .andExpect(jsonPath("$.customerLatitude").value(32.08))
+                .andExpect(jsonPath("$.customerLongitude").value(34.78))
+                // The two PII fields are ABSENT entirely (not null)
+                .andExpect(jsonPath("$.customerAddress").doesNotExist())
+                .andExpect(jsonPath("$.customerPhone").doesNotExist());
     }
 
     // ===================================================================
