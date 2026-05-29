@@ -2,7 +2,7 @@
   "info": {
     "name": "Lead Manager Backend",
     "_postman_id": "8a3e5d9c-1234-4567-8901-abcdef012345",
-    "description": "All endpoints currently implemented across slices 1-4 of the Lead Manager backend.\n\n**Setup:**\n1. Boot the backend locally (see `.claude/skills/start-lead-manager-backend/SKILL.md`).\n2. Run the requests in order. The 'Login Alice' and 'Login Bob' requests have test scripts that automatically save their access tokens into collection variables `TOKEN_A` and `TOKEN_B`. The 'Create job' request saves the new job id into `JOB_ID`.\n3. All endpoints expect `Authorization: Bearer {{TOKEN_A}}` (or `{{TOKEN_B}}` for the 'stranger' scenario).\n\n**Slices covered:** 1 (auth), 2 (service categories), 3 (service areas + nearby providers), 4 (job core lifecycle).",
+    "description": "All endpoints currently implemented across slices 1-5 of the Lead Manager backend.\n\n**Setup:**\n1. Boot the backend locally (see `.claude/skills/start-lead-manager-backend/SKILL.md`).\n2. Run the requests in order. The login requests have test scripts that automatically save their access tokens into collection variables. The 'Create job' / 'Create transfer' requests save the new ids too.\n3. All endpoints expect `Authorization: Bearer {{TOKEN_A}}` (or `{{TOKEN_B}}`, `{{TOKEN_C}}` for the candidate / stranger scenarios).\n\n**Slices covered:** 1 (auth), 2 (service categories), 3 (service areas + nearby providers), 4 (job core lifecycle), 5 (transfers + blind-mask).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -46,6 +46,30 @@
       "value": "",
       "type": "string",
       "description": "Set automatically by the 'Create service area' request."
+    },
+    {
+      "key": "TOKEN_C",
+      "value": "",
+      "type": "string",
+      "description": "Set automatically by 'Login Carol' — the 'stranger' for slice-5 visibility checks."
+    },
+    {
+      "key": "USER_ID_A",
+      "value": "",
+      "type": "string",
+      "description": "Alice's user id (the originator). Set by 'Get Alice's id'."
+    },
+    {
+      "key": "USER_ID_B",
+      "value": "",
+      "type": "string",
+      "description": "Bob's user id (the transfer candidate). Set by 'Get Bob's id'."
+    },
+    {
+      "key": "TRANSFER_ID",
+      "value": "",
+      "type": "string",
+      "description": "Set automatically by 'Propose transfer to Bob'."
     }
   ],
   "item": [
@@ -702,6 +726,489 @@
               "raw": "{{BASE_URL}}/jobs/{{JOB_ID}}",
               "host": ["{{BASE_URL}}"],
               "path": ["jobs", "{{JOB_ID}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "05 - Transfers + Blind Mask (slice 5)",
+      "description": "Three-actor walkthrough: Alice (originator) → Bob (candidate) → Carol (stranger). Run in order — auto-saves USER_ID_A, USER_ID_B, JOB_ID, TRANSFER_ID, TOKEN_C. Requires Alice and Bob already logged in (folder 01).",
+      "item": [
+        {
+          "name": "1a. Register Carol (the stranger)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/register",
+              "host": ["{{BASE_URL}}"],
+              "path": ["auth", "register"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"carol@test.io\",\n  \"password\": \"correcthorsebatterystaple\",\n  \"displayName\": \"Carol\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "1b. Login Carol (auto-saves TOKEN_C)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "if (data.accessToken) {",
+                  "    pm.collectionVariables.set('TOKEN_C', data.accessToken);",
+                  "    console.log('TOKEN_C saved');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/login",
+              "host": ["{{BASE_URL}}"],
+              "path": ["auth", "login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"carol@test.io\",\n  \"password\": \"correcthorsebatterystaple\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2. Get Alice's id (auto-saves USER_ID_A)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "if (data.id) pm.collectionVariables.set('USER_ID_A', data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/users/me",
+              "host": ["{{BASE_URL}}"],
+              "path": ["users", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3. Get Bob's id (auto-saves USER_ID_B)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "if (data.id) pm.collectionVariables.set('USER_ID_B', data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_B}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/users/me",
+              "host": ["{{BASE_URL}}"],
+              "path": ["users", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4. Alice creates a job (auto-saves JOB_ID)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "if (data.id) pm.collectionVariables.set('JOB_ID', data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceCategoryId\": 7,\n  \"today\": false,\n  \"title\": \"Leaking faucet\",\n  \"description\": \"Kitchen sink, drips every 2 seconds\",\n  \"customerName\": \"Jane Doe\",\n  \"customerPhone\": \"+972-50-1234567\",\n  \"customerAddress\": \"Dizengoff 100, Tel Aviv\",\n  \"customerLatitude\": 32.08,\n  \"customerLongitude\": 34.78,\n  \"priceCents\": 15000,\n  \"currency\": \"USD\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "5. Alice proposes transfer to Bob (auto-saves TRANSFER_ID)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "if (data.id) pm.collectionVariables.set('TRANSFER_ID', data.id);",
+                  "pm.test('status is PROPOSED', () => pm.expect(data.status).to.eql('PROPOSED'));",
+                  "pm.test('preTransferState is OPEN_GENERAL', () => pm.expect(data.preTransferState).to.eql('OPEN_GENERAL'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs/{{JOB_ID}}/transfers",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs", "{{JOB_ID}}", "transfers"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"toUserId\": {{USER_ID_B}},\n  \"commissionPct\": 20.00\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "6. Bob fetches the job — MASKED view (customerPhone/Address absent!)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('customerPhone is ABSENT', () => pm.expect(data).to.not.have.property('customerPhone'));",
+                  "pm.test('customerAddress is ABSENT', () => pm.expect(data).to.not.have.property('customerAddress'));",
+                  "pm.test('customerName is visible', () => pm.expect(data.customerName).to.eql('Jane Doe'));",
+                  "pm.test('customerLatitude visible', () => pm.expect(data.customerLatitude).to.eql(32.08));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_B}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs/{{JOB_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs", "{{JOB_ID}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "7. Carol (stranger) fetches the job → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('code is RESOURCE_NOT_FOUND', () => pm.expect(pm.response.json().code).to.eql('RESOURCE_NOT_FOUND'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_C}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs/{{JOB_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs", "{{JOB_ID}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "8. Second propose on same job → 409 (job not OPEN anymore)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('code is JOB_STATE_TRANSITION_NOT_ALLOWED', () => pm.expect(pm.response.json().code).to.eql('JOB_STATE_TRANSITION_NOT_ALLOWED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs/{{JOB_ID}}/transfers",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs", "{{JOB_ID}}", "transfers"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"toUserId\": {{USER_ID_A}},\n  \"commissionPct\": 30.00\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "9. Bob declines",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('status is DECLINED', () => pm.expect(pm.response.json().status).to.eql('DECLINED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_B}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/transfers/{{TRANSFER_ID}}/decline",
+              "host": ["{{BASE_URL}}"],
+              "path": ["transfers", "{{TRANSFER_ID}}", "decline"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10. Bob fetches the job → 404 (proposal closed, no visibility)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_B}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs/{{JOB_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs", "{{JOB_ID}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "11. Alice proposes AGAIN to Bob (saves new TRANSFER_ID)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "if (data.id) pm.collectionVariables.set('TRANSFER_ID', data.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs/{{JOB_ID}}/transfers",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs", "{{JOB_ID}}", "transfers"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"toUserId\": {{USER_ID_B}},\n  \"commissionPct\": 25.50\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "12. Bob accepts → he becomes the assignee, sees FULL view",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('status is ACCEPTED', () => pm.expect(pm.response.json().status).to.eql('ACCEPTED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_B}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/transfers/{{TRANSFER_ID}}/accept",
+              "host": ["{{BASE_URL}}"],
+              "path": ["transfers", "{{TRANSFER_ID}}", "accept"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "13. Bob fetches the job — FULL view (PII visible now)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "pm.test('state is ASSIGNED', () => pm.expect(data.state).to.eql('ASSIGNED'));",
+                  "pm.test('customerPhone present', () => pm.expect(data.customerPhone).to.eql('+972-50-1234567'));",
+                  "pm.test('customerAddress present', () => pm.expect(data.customerAddress).to.eql('Dizengoff 100, Tel Aviv'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_B}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs/{{JOB_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs", "{{JOB_ID}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "14. Chain history (Alice's view)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs/{{JOB_ID}}/transfers",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs", "{{JOB_ID}}", "transfers"]
+            },
+            "description": "Returns both transfers (DECLINED + ACCEPTED) newest-first."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "05 - Transfers — error paths",
+      "item": [
+        {
+          "name": "A. Self-proposal → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('code is VALIDATION_FAILED', () => pm.expect(pm.response.json().code).to.eql('VALIDATION_FAILED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs/{{JOB_ID}}/transfers",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs", "{{JOB_ID}}", "transfers"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"toUserId\": {{USER_ID_A}},\n  \"commissionPct\": 10.00\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "B. Commission > 100% → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs/{{JOB_ID}}/transfers",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs", "{{JOB_ID}}", "transfers"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"toUserId\": {{USER_ID_B}},\n  \"commissionPct\": 150.00\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "C. Carol cannot cancel Alice's transfer → 404",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_C}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/transfers/{{TRANSFER_ID}}/cancel",
+              "host": ["{{BASE_URL}}"],
+              "path": ["transfers", "{{TRANSFER_ID}}", "cancel"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "D. Accept an already-ACCEPTED transfer → 409",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_B}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/transfers/{{TRANSFER_ID}}/accept",
+              "host": ["{{BASE_URL}}"],
+              "path": ["transfers", "{{TRANSFER_ID}}", "accept"]
             }
           },
           "response": []

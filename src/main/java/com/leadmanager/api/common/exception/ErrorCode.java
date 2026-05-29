@@ -25,6 +25,8 @@ public enum ErrorCode {
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "resource-not-found", "Resource not found"),
     EMAIL_TAKEN(HttpStatus.CONFLICT, "email-taken", "Email already registered"),
     JOB_STATE_TRANSITION_NOT_ALLOWED(HttpStatus.CONFLICT, "job-state-transition-not-allowed", "Job is not in a state that allows this operation"),
+    TRANSFER_STATE_TRANSITION_NOT_ALLOWED(HttpStatus.CONFLICT, "transfer-state-transition-not-allowed", "Transfer is not in a state that allows this operation"),
+    OPEN_TRANSFER_ALREADY_EXISTS(HttpStatus.CONFLICT, "open-transfer-already-exists", "An open transfer proposal already exists for this job"),
     CONCURRENT_MODIFICATION(HttpStatus.CONFLICT, "concurrent-modification", "The resource was modified by another request; please retry"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "internal-error", "Internal server error");
 

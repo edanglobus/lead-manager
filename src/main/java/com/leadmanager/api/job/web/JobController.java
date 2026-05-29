@@ -15,7 +15,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 import com.leadmanager.api.common.api.ApiVersion;
 import com.leadmanager.api.common.security.AuthenticatedUser;
 import com.leadmanager.api.job.Job;
+import com.leadmanager.api.job.JobAccess;
 import com.leadmanager.api.job.JobService;
+import com.leadmanager.api.job.JobVisibilityPolicy;
 
 import jakarta.validation.Valid;
 
@@ -82,14 +84,33 @@ public class JobController {
     }
 
     /**
-     * Returns the job iff the caller is its originator or current
-     * assignee; otherwise 404 (same ids-enumeration concern as the
-     * service-area delete endpoint).
+     * Returns the job to a caller with any visibility on it.
+     * <p>
+     * Dispatches on {@link JobVisibilityPolicy.Visibility}:
+     * <ul>
+     *   <li>{@code FULL} (originator / current assignee) → full
+     *       {@link JobResponse}.</li>
+     *   <li>{@code MASKED} (transfer candidate with an open
+     *       proposal) → {@link MaskedJobResponse}, with
+     *       {@code customerPhone} and {@code customerAddress}
+     *       absent from the JSON entirely.</li>
+     *   <li>{@code NONE} — service already converted to 404
+     *       {@code RESOURCE_NOT_FOUND} (no enumeration leak).</li>
+     * </ul>
+     * The return type is {@code ResponseEntity<?>} because the
+     * two response shapes are distinct records. Both serialise to
+     * application/json; only the field set differs.
      */
     @GetMapping("/{id}")
-    public JobResponse findOne(@AuthenticationPrincipal AuthenticatedUser me,
-                               @PathVariable Long id) {
-        return mapper.toResponse(service.findOne(me.id(), id));
+    public ResponseEntity<?> findOne(@AuthenticationPrincipal AuthenticatedUser me,
+                                     @PathVariable Long id) {
+        JobAccess access = service.findOne(me.id(), id);
+        return switch (access.visibility()) {
+            case FULL   -> ResponseEntity.ok(mapper.toResponse(access.job()));
+            case MASKED -> ResponseEntity.ok(mapper.toMaskedResponse(access.job()));
+            case NONE   -> throw new IllegalStateException(
+                    "service must never return NONE — should have thrown 404");
+        };
     }
 
     /** Caller's own jobs as originator, newest-first. */

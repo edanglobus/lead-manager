@@ -17,6 +17,8 @@ import com.leadmanager.api.common.exception.ApiException;
 import com.leadmanager.api.common.exception.ErrorCode;
 import com.leadmanager.api.servicecategory.ServiceCategory;
 import com.leadmanager.api.servicecategory.ServiceCategoryRepository;
+import com.leadmanager.api.transfer.TransferRepository;
+import com.leadmanager.api.transfer.TransferStatus;
 
 @Service
 public class JobServiceImpl implements JobService {
@@ -29,13 +31,19 @@ public class JobServiceImpl implements JobService {
     private final JobRepository jobRepository;
     private final JobStateTransitionRepository transitionRepository;
     private final ServiceCategoryRepository categoryRepository;
+    private final TransferRepository transferRepository;
+    private final JobVisibilityPolicy visibilityPolicy;
 
     public JobServiceImpl(JobRepository jobRepository,
                           JobStateTransitionRepository transitionRepository,
-                          ServiceCategoryRepository categoryRepository) {
+                          ServiceCategoryRepository categoryRepository,
+                          TransferRepository transferRepository,
+                          JobVisibilityPolicy visibilityPolicy) {
         this.jobRepository = jobRepository;
         this.transitionRepository = transitionRepository;
         this.categoryRepository = categoryRepository;
+        this.transferRepository = transferRepository;
+        this.visibilityPolicy = visibilityPolicy;
     }
 
     // -------------------------------------------------------------------
@@ -81,10 +89,22 @@ public class JobServiceImpl implements JobService {
 
     @Override
     @Transactional(readOnly = true)
-    public Job findOne(Long callerUserId, Long jobId) {
-        return jobRepository.findById(jobId)
-                .filter(visibleTo(callerUserId))
-                .orElseThrow(() -> notFound());
+    public JobAccess findOne(Long callerUserId, Long jobId) {
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(JobServiceImpl::notFound);
+
+        // Pull the open proposal (if any) so the policy can decide
+        // MASKED vs NONE for a non-owner caller. Cheap lookup against
+        // the partial unique index transfers_open_per_job_uq.
+        JobVisibilityPolicy.Visibility visibility = visibilityPolicy.visibilityFor(
+                callerUserId,
+                job,
+                transferRepository.findFirstByJobIdAndStatus(jobId, TransferStatus.PROPOSED));
+
+        if (visibility == JobVisibilityPolicy.Visibility.NONE) {
+            throw notFound();
+        }
+        return new JobAccess(job, visibility);
     }
 
     @Override
@@ -199,10 +219,6 @@ public class JobServiceImpl implements JobService {
 
     private static Predicate<Job> isCurrentAssignee(Long userId) {
         return job -> Objects.equals(job.getCurrentAssigneeUserId(), userId);
-    }
-
-    private static Predicate<Job> visibleTo(Long userId) {
-        return isOriginator(userId).or(isCurrentAssignee(userId));
     }
 
     private static ApiException notFound() {

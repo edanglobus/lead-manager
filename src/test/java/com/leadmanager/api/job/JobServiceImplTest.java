@@ -18,7 +18,6 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.OptimisticLockingFailureException;
@@ -60,12 +59,26 @@ class JobServiceImplTest {
     @Mock private JobRepository jobRepository;
     @Mock private JobStateTransitionRepository transitionRepository;
     @Mock private ServiceCategoryRepository categoryRepository;
-    @InjectMocks private JobServiceImpl service;
+    @Mock private com.leadmanager.api.transfer.TransferRepository transferRepository;
+
+    // Use the REAL JobVisibilityPolicy — it's a pure function, mocking
+    // it would test our test, not the policy. The findOne tests rely
+    // on this to exercise the actual rule end-to-end.
+    private final JobVisibilityPolicy visibilityPolicy = new JobVisibilityPolicy();
+
+    private JobServiceImpl service;
 
     private ServiceCategory activeCategory;
 
     @BeforeEach
     void setUp() {
+        service = new JobServiceImpl(
+                jobRepository,
+                transitionRepository,
+                categoryRepository,
+                transferRepository,
+                visibilityPolicy);
+
         activeCategory = ServiceCategory.builder()
                 .code("plumbing").displayName("Plumbing").active(true).sortOrder(120)
                 .build();
@@ -134,29 +147,63 @@ class JobServiceImplTest {
     // ===================================================================
 
     @Test
-    void findOne_returnsJob_whenCallerIsOriginator() {
+    void findOne_returnsFullAccess_whenCallerIsOriginator() {
         Job job = newJob(JobState.OPEN_GENERAL, null);
         when(jobRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+        when(transferRepository.findFirstByJobIdAndStatus(JOB_ID,
+                com.leadmanager.api.transfer.TransferStatus.PROPOSED))
+                .thenReturn(Optional.empty());
 
-        Job result = service.findOne(ORIGINATOR_ID, JOB_ID);
+        JobAccess result = service.findOne(ORIGINATOR_ID, JOB_ID);
 
-        assertThat(result).isSameAs(job);
+        assertThat(result.job()).isSameAs(job);
+        assertThat(result.visibility()).isEqualTo(JobVisibilityPolicy.Visibility.FULL);
     }
 
     @Test
-    void findOne_returnsJob_whenCallerIsCurrentAssignee() {
+    void findOne_returnsFullAccess_whenCallerIsCurrentAssignee() {
         Job job = newJob(JobState.ASSIGNED, ASSIGNEE_ID);
         when(jobRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+        when(transferRepository.findFirstByJobIdAndStatus(JOB_ID,
+                com.leadmanager.api.transfer.TransferStatus.PROPOSED))
+                .thenReturn(Optional.empty());
 
-        Job result = service.findOne(ASSIGNEE_ID, JOB_ID);
+        JobAccess result = service.findOne(ASSIGNEE_ID, JOB_ID);
 
-        assertThat(result).isSameAs(job);
+        assertThat(result.job()).isSameAs(job);
+        assertThat(result.visibility()).isEqualTo(JobVisibilityPolicy.Visibility.FULL);
     }
 
     @Test
-    void findOne_returns404_whenCallerIsStranger() {
+    void findOne_returnsMaskedAccess_whenCallerHasOpenProposalTargetingThem() {
+        Job job = newJob(JobState.PENDING_TRANSFER, null);
+        when(jobRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+
+        com.leadmanager.api.transfer.Transfer proposal =
+                com.leadmanager.api.transfer.Transfer.builder()
+                        .jobId(JOB_ID)
+                        .fromUserId(ORIGINATOR_ID)
+                        .toUserId(STRANGER_ID)  // the "candidate"
+                        .commissionPct(new java.math.BigDecimal("15.00"))
+                        .preTransferState(JobState.OPEN_GENERAL)
+                        .build();
+        when(transferRepository.findFirstByJobIdAndStatus(JOB_ID,
+                com.leadmanager.api.transfer.TransferStatus.PROPOSED))
+                .thenReturn(Optional.of(proposal));
+
+        JobAccess result = service.findOne(STRANGER_ID, JOB_ID);
+
+        assertThat(result.job()).isSameAs(job);
+        assertThat(result.visibility()).isEqualTo(JobVisibilityPolicy.Visibility.MASKED);
+    }
+
+    @Test
+    void findOne_returns404_whenCallerIsStrangerAndNoTargetedProposal() {
         Job job = newJob(JobState.ASSIGNED, ASSIGNEE_ID);
         when(jobRepository.findById(JOB_ID)).thenReturn(Optional.of(job));
+        when(transferRepository.findFirstByJobIdAndStatus(JOB_ID,
+                com.leadmanager.api.transfer.TransferStatus.PROPOSED))
+                .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.findOne(STRANGER_ID, JOB_ID))
                 .isInstanceOf(ApiException.class)

@@ -48,11 +48,17 @@ public interface JobService {
     Job create(Long actorUserId, JobCreateCommand command);
 
     /**
-     * Returns the job with the given id iff the caller is its
-     * originator or current assignee. Otherwise 404 — the
-     * "not yours" and "not found" cases are merged.
+     * Returns a {@link JobAccess} for the job iff the caller has any
+     * visibility on it: originator, current assignee, or transfer
+     * candidate with an open proposal. The returned record carries
+     * the {@link JobVisibilityPolicy.Visibility} so the HTTP layer
+     * can dispatch to the right DTO shape (full vs masked).
+     * <p>
+     * 404 ({@code RESOURCE_NOT_FOUND}) when the job is missing OR the
+     * caller has no visibility — same merged-cases rule (no
+     * enumeration leak via response codes).
      */
-    Job findOne(Long callerUserId, Long jobId);
+    JobAccess findOne(Long callerUserId, Long jobId);
 
     /** Caller's own jobs as originator, newest-first. */
     List<Job> listMyOriginated(Long userId);
