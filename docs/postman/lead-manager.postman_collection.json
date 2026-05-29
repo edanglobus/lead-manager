@@ -1,0 +1,712 @@
+{
+  "info": {
+    "name": "Lead Manager Backend",
+    "_postman_id": "8a3e5d9c-1234-4567-8901-abcdef012345",
+    "description": "All endpoints currently implemented across slices 1-4 of the Lead Manager backend.\n\n**Setup:**\n1. Boot the backend locally (see `.claude/skills/start-lead-manager-backend/SKILL.md`).\n2. Run the requests in order. The 'Login Alice' and 'Login Bob' requests have test scripts that automatically save their access tokens into collection variables `TOKEN_A` and `TOKEN_B`. The 'Create job' request saves the new job id into `JOB_ID`.\n3. All endpoints expect `Authorization: Bearer {{TOKEN_A}}` (or `{{TOKEN_B}}` for the 'stranger' scenario).\n\n**Slices covered:** 1 (auth), 2 (service categories), 3 (service areas + nearby providers), 4 (job core lifecycle).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:8080/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "TOKEN_A",
+      "value": "",
+      "type": "string",
+      "description": "Set automatically by the 'Login Alice' request."
+    },
+    {
+      "key": "TOKEN_B",
+      "value": "",
+      "type": "string",
+      "description": "Set automatically by the 'Login Bob' request. Use this token to verify the 404-not-403 visibility guard."
+    },
+    {
+      "key": "REFRESH_TOKEN_A",
+      "value": "",
+      "type": "string",
+      "description": "Set automatically by the 'Login Alice' request."
+    },
+    {
+      "key": "JOB_ID",
+      "value": "",
+      "type": "string",
+      "description": "Set automatically by the 'Create job' request."
+    },
+    {
+      "key": "JOB_ID_2",
+      "value": "",
+      "type": "string",
+      "description": "Set automatically by the 'Create second job (for cancel demo)' request."
+    },
+    {
+      "key": "SERVICE_AREA_ID",
+      "value": "",
+      "type": "string",
+      "description": "Set automatically by the 'Create service area' request."
+    }
+  ],
+  "item": [
+    {
+      "name": "01 - Auth (slice 1)",
+      "item": [
+        {
+          "name": "Register Alice",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/register",
+              "host": ["{{BASE_URL}}"],
+              "path": ["auth", "register"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@test.io\",\n  \"password\": \"correcthorsebatterystaple\",\n  \"displayName\": \"Alice\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register Bob (the 'stranger')",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/register",
+              "host": ["{{BASE_URL}}"],
+              "path": ["auth", "register"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"bob@test.io\",\n  \"password\": \"correcthorsebatterystaple\",\n  \"displayName\": \"Bob\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login Alice (auto-saves TOKEN_A)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "if (data.accessToken) {",
+                  "    pm.collectionVariables.set('TOKEN_A', data.accessToken);",
+                  "    console.log('TOKEN_A saved');",
+                  "}",
+                  "if (data.refreshToken) {",
+                  "    pm.collectionVariables.set('REFRESH_TOKEN_A', data.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/login",
+              "host": ["{{BASE_URL}}"],
+              "path": ["auth", "login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"alice@test.io\",\n  \"password\": \"correcthorsebatterystaple\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login Bob (auto-saves TOKEN_B)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "if (data.accessToken) {",
+                  "    pm.collectionVariables.set('TOKEN_B', data.accessToken);",
+                  "    console.log('TOKEN_B saved');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/login",
+              "host": ["{{BASE_URL}}"],
+              "path": ["auth", "login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"bob@test.io\",\n  \"password\": \"correcthorsebatterystaple\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh access token (rotates pair)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/refresh",
+              "host": ["{{BASE_URL}}"],
+              "path": ["auth", "refresh"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{REFRESH_TOKEN_A}}\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout (revokes refresh family)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/auth/logout",
+              "host": ["{{BASE_URL}}"],
+              "path": ["auth", "logout"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{REFRESH_TOKEN_A}}\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /users/me",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/users/me",
+              "host": ["{{BASE_URL}}"],
+              "path": ["users", "me"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 - Service Categories (slice 2)",
+      "item": [
+        {
+          "name": "GET /service-categories (12 seeded trades)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/service-categories",
+              "host": ["{{BASE_URL}}"],
+              "path": ["service-categories"]
+            },
+            "description": "Reference data: appliance_repair=1, cleaning=2, computer_repair=3, electrical=4, gardening=5, handyman=6, hvac=7, locksmith=8, moving=9, painting=10, pest_control=11, plumbing=12."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 - Service Areas (slice 3)",
+      "item": [
+        {
+          "name": "Create service area (HVAC, ~Dizengoff)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "if (data.id) {",
+                  "    pm.collectionVariables.set('SERVICE_AREA_ID', data.id);",
+                  "    console.log('SERVICE_AREA_ID =', data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/service-areas",
+              "host": ["{{BASE_URL}}"],
+              "path": ["service-areas"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceCategoryId\": 7,\n  \"latitude\": 32.0833,\n  \"longitude\": 34.7741,\n  \"radiusMeters\": 5000\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /service-areas/me",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/service-areas/me",
+              "host": ["{{BASE_URL}}"],
+              "path": ["service-areas", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /service-areas/{id}",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/service-areas/{{SERVICE_AREA_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["service-areas", "{{SERVICE_AREA_ID}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET /providers/nearby (HVAC near Dizengoff Sq.)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/providers/nearby?lat=32.0788&lng=34.7741&categoryId=7&limit=25",
+              "host": ["{{BASE_URL}}"],
+              "path": ["providers", "nearby"],
+              "query": [
+                { "key": "lat", "value": "32.0788" },
+                { "key": "lng", "value": "34.7741" },
+                { "key": "categoryId", "value": "7" },
+                { "key": "limit", "value": "25" }
+              ]
+            },
+            "description": "ST_DWithin spatial query. Recreate the service area first if you ran the DELETE above."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04 - Jobs (slice 4) — happy path lifecycle",
+      "item": [
+        {
+          "name": "1. Create job (auto-saves JOB_ID)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "if (data.id) {",
+                  "    pm.collectionVariables.set('JOB_ID', data.id);",
+                  "    console.log('JOB_ID =', data.id);",
+                  "}",
+                  "pm.test('state is OPEN_GENERAL', () => pm.expect(data.state).to.eql('OPEN_GENERAL'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceCategoryId\": 7,\n  \"today\": false,\n  \"title\": \"Leaking faucet\",\n  \"description\": \"Kitchen sink, drips every 2 seconds\",\n  \"customerName\": \"Jane Doe\",\n  \"customerPhone\": \"+972-50-1234567\",\n  \"customerAddress\": \"Dizengoff 100, Tel Aviv\",\n  \"customerLatitude\": 32.08,\n  \"customerLongitude\": 34.78,\n  \"priceCents\": 15000,\n  \"currency\": \"USD\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2. POST /jobs/{id}/self-assign",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('state is ASSIGNED', () => pm.expect(pm.response.json().state).to.eql('ASSIGNED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs/{{JOB_ID}}/self-assign",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs", "{{JOB_ID}}", "self-assign"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3. POST /jobs/{id}/start",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('state is IN_PROGRESS', () => pm.expect(pm.response.json().state).to.eql('IN_PROGRESS'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs/{{JOB_ID}}/start",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs", "{{JOB_ID}}", "start"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4. POST /jobs/{id}/complete",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('state is COMPLETED', () => pm.expect(pm.response.json().state).to.eql('COMPLETED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs/{{JOB_ID}}/complete",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs", "{{JOB_ID}}", "complete"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "5. POST /jobs/{id}/close",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('state is CLOSED_PAID', () => pm.expect(pm.response.json().state).to.eql('CLOSED_PAID'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs/{{JOB_ID}}/close",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs", "{{JOB_ID}}", "close"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "6. GET /jobs/{id}",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs/{{JOB_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs", "{{JOB_ID}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "7. GET /jobs/mine/originated",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs/mine/originated",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs", "mine", "originated"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "8. GET /jobs/mine/assigned",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs/mine/assigned",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs", "mine", "assigned"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04 - Jobs — cancel demo",
+      "item": [
+        {
+          "name": "Create second job (auto-saves JOB_ID_2)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "if (data.id) {",
+                  "    pm.collectionVariables.set('JOB_ID_2', data.id);",
+                  "    console.log('JOB_ID_2 =', data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceCategoryId\": 12,\n  \"today\": true,\n  \"title\": \"Clogged drain\",\n  \"description\": \"Bathroom sink fully blocked\",\n  \"customerName\": \"Sam Smith\",\n  \"customerPhone\": \"+972-50-7654321\",\n  \"customerAddress\": \"Rothschild 50, Tel Aviv\",\n  \"customerLatitude\": 32.0654,\n  \"customerLongitude\": 34.7747,\n  \"priceCents\": 22000,\n  \"currency\": \"USD\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /jobs/{id}/cancel (with reason)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('state is CANCELLED', () => pm.expect(pm.response.json().state).to.eql('CANCELLED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs/{{JOB_ID_2}}/cancel",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs", "{{JOB_ID_2}}", "cancel"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"customer flake\"\n}"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04 - Jobs — error paths (guardrails)",
+      "item": [
+        {
+          "name": "A. Start a CLOSED_PAID job → 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409 Conflict', () => pm.response.to.have.status(409));",
+                  "pm.test('code is JOB_STATE_TRANSITION_NOT_ALLOWED', () => pm.expect(pm.response.json().code).to.eql('JOB_STATE_TRANSITION_NOT_ALLOWED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs/{{JOB_ID}}/start",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs", "{{JOB_ID}}", "start"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "B. Bob fetches Alice's job → 404 (not 403!)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('code is RESOURCE_NOT_FOUND', () => pm.expect(pm.response.json().code).to.eql('RESOURCE_NOT_FOUND'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{TOKEN_B}}" }],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs/{{JOB_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs", "{{JOB_ID}}"]
+            },
+            "description": "The anti-enumeration guard: Bob (a stranger) cannot tell the difference between 'this id is Alice's' and 'this id does not exist'."
+          },
+          "response": []
+        },
+        {
+          "name": "C. Create without title → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('code is VALIDATION_FAILED', () => pm.expect(pm.response.json().code).to.eql('VALIDATION_FAILED'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceCategoryId\": 7,\n  \"today\": false,\n  \"description\": \"missing title\",\n  \"customerName\": \"Jane Doe\",\n  \"customerPhone\": \"+972-50-1234567\",\n  \"customerAddress\": \"Dizengoff 100, Tel Aviv\",\n  \"customerLatitude\": 32.08,\n  \"customerLongitude\": 34.78,\n  \"priceCents\": 15000,\n  \"currency\": \"USD\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "D. Create with lowercase currency → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceCategoryId\": 7,\n  \"today\": false,\n  \"title\": \"Bad currency case\",\n  \"description\": \"x\",\n  \"customerName\": \"Jane Doe\",\n  \"customerPhone\": \"+972-50-1234567\",\n  \"customerAddress\": \"Dizengoff 100, Tel Aviv\",\n  \"customerLatitude\": 32.08,\n  \"customerLongitude\": 34.78,\n  \"priceCents\": 15000,\n  \"currency\": \"usd\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "E. Create with non-existent category → 404",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{TOKEN_A}}" }
+            ],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"serviceCategoryId\": 999,\n  \"today\": false,\n  \"title\": \"x\",\n  \"description\": \"x\",\n  \"customerName\": \"Jane Doe\",\n  \"customerPhone\": \"+972-50-1234567\",\n  \"customerAddress\": \"Dizengoff 100, Tel Aviv\",\n  \"customerLatitude\": 32.08,\n  \"customerLongitude\": 34.78,\n  \"priceCents\": 15000,\n  \"currency\": \"USD\"\n}"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "F. No Authorization header → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/jobs/{{JOB_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["jobs", "{{JOB_ID}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
